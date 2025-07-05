@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Códigos QR Avanzado</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 1200px; margin: auto;}
+        h1 { text-align: center; color: #333; }
+        .form-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media (min-width: 992px) { .form-grid { grid-template-columns: 1fr 1fr; } }
+
+        .form-section { border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin-bottom: 15px; }
+        .form-section h3, .form-section h4 { margin-top: 0; color: #555; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="url"], input[type="email"], input[type="tel"],
+        input[type="number"], input[type="datetime-local"], input[type="date"],
+        textarea, select {
+            width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ccc;
+            border-radius: 4px; box-sizing: border-box;
+        }
+        textarea { min-height: 60px; resize: vertical; }
+        input[type="color"] { width: calc(50% - 12px); height: 40px; vertical-align: middle; margin-left: 5px;}
+        input[type="checkbox"] { margin-right: 5px; vertical-align: middle; }
+
+        button, .download-button { /* Applied to preview button as well */
+            background-color: #007bff; color: white; padding: 10px 15px; border: none;
+            border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px; margin-right: 5px;
+        }
+        button:hover, .download-button:hover { background-color: #0056b3; }
+        #preview_button { background-color: #6c757d;}
+        #preview_button:hover { background-color: #5a6268;}
+
+        #qr_code_preview_container { text-align: center; margin-top: 20px; min-height:200px; border:1px dashed #ccc; padding:10px; background-color: #f9f9f9; overflow: auto;}
+        #qr_code_preview_container img { max-width: 100%; max-height: 300px; border: 1px solid #eee; }
+        #qr_code_preview_container pre { white-space: pre-wrap; word-wrap: break-word; text-align: left; font-family: monospace; font-size: 10px; }
+
+        .content-fields { border-left: 3px solid #007bff; padding-left: 15px; margin-top:10px; }
+        .hidden { display: none; }
+        small { color: #777; font-size: 0.9em; display: block; margin-bottom: 8px; }
+        .required-mark { color: red; margin-left: 2px; }
+        input:invalid { border-color: red; }
+        .error-message { color: red; font-size: 0.9em; margin-top: -5px; margin-bottom: 5px;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Generador de Códigos QR Avanzado</h1>
+        <form id="qrForm" class="form-grid" novalidate> <!-- novalidate para manejar validación con JS -->
+            <div id="left-panel">
+                <div class="form-section">
+                    <h3>1. Tipo de Contenido</h3>
+                    <label for="content_type">Selecciona el tipo de QR:<span class="required-mark">*</span></label>
+                    <select id="content_type" name="content_type">
+                        {% for value, display_text in content_types.items() %}
+                        <option value="{{ value }}">{{ display_text }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <div id="fields_url" class="content-fields">
+                        <label for="data_url">URL:<span class="required-mark">*</span></label>
+                        <input type="url" id="data_url" name="data_url" placeholder="https://ejemplo.com" required>
+                    </div>
+                    <div id="fields_text" class="content-fields hidden">
+                        <label for="data_text">Texto:<span class="required-mark">*</span></label>
+                        <textarea id="data_text" name="data_text" placeholder="Escribe tu texto aquí" required></textarea>
+                    </div>
+
+                    <div id="fields_wifi" class="content-fields hidden">
+                        <h4>Configuración WiFi</h4>
+                        <label for="wifi_ssid">SSID (Nombre de Red):<span class="required-mark">*</span></label>
+                        <input type="text" id="wifi_ssid" name="wifi_ssid" placeholder="NombreDeTuRed" required>
+                        <label for="wifi_password">Contraseña:</label>
+                        <input type="text" id="wifi_password" name="wifi_password" placeholder="ContraseñaDeRed (vacío si es abierta)">
+                        <label for="wifi_security">Tipo de Seguridad:<span class="required-mark">*</span></label>
+                        <select id="wifi_security" name="wifi_security" required>
+                            {% for value, display_text in wifi_security_types.items() %}
+                            <option value="{{ value }}">{{ display_text }}</option>
+                            {% endfor %}
+                        </select>
+                        <label><input type="checkbox" id="wifi_hidden" name="wifi_hidden"> Red Oculta</label>
+                    </div>
+
+                    <div id="fields_vcard" class="content-fields hidden">
+                        <h4>Información de Contacto (vCard)</h4>
+                        <label for="vcard_firstname">Nombre:</label>
+                        <input type="text" id="vcard_firstname" name="vcard_firstname">
+                        <label for="vcard_lastname">Apellido:</label>
+                        <input type="text" id="vcard_lastname" name="vcard_lastname">
+                        <label for="vcard_displayname">Nombre a Mostrar:<span class="required-mark">*</span></label>
+                        <input type="text" id="vcard_displayname" name="vcard_displayname" required>
+                        <small>Al menos Nombre/Apellido o Nombre a Mostrar es requerido.</small>
+
+                        <label for="vcard_company">Empresa:</label>
+                        <input type="text" id="vcard_company" name="vcard_company">
+                        <label for="vcard_jobtitle">Cargo:</label>
+                        <input type="text" id="vcard_jobtitle" name="vcard_jobtitle">
+                        <label for="vcard_email">Email:</label>
+                        <input type="email" id="vcard_email" name="vcard_email">
+                        <label for="vcard_phone_work">Teléfono (Trabajo):</label>
+                        <input type="tel" id="vcard_phone_work" name="vcard_phone_work">
+                        <label for="vcard_phone_mobile">Móvil:</label>
+                        <input type="tel" id="vcard_phone_mobile" name="vcard_phone_mobile">
+                        <label for="vcard_phone_home">Teléfono (Casa):</label>
+                        <input type="tel" id="vcard_phone_home" name="vcard_phone_home">
+                        <label for="vcard_fax">Fax:</label>
+                        <input type="tel" id="vcard_fax" name="vcard_fax">
+
+                        <label for="vcard_address_full">Dirección Completa (una línea):</label>
+                        <input type="text" id="vcard_address_full" name="vcard_address_full" placeholder="Ej: Calle Falsa 123, Ciudad, CP, País">
+                        <small>O use los campos detallados:</small>
+                        <label for="vcard_street">Calle y Número:</label>
+                        <input type="text" id="vcard_street" name="vcard_street">
+                        <label for="vcard_city">Ciudad:</label>
+                        <input type="text" id="vcard_city" name="vcard_city">
+                        <label for="vcard_region">Región/Estado:</label>
+                        <input type="text" id="vcard_region" name="vcard_region">
+                        <label for="vcard_postcode">Código Postal:</label>
+                        <input type="text" id="vcard_postcode" name="vcard_postcode">
+                        <label for="vcard_country">País:</label>
+                        <input type="text" id="vcard_country" name="vcard_country">
+
+                        <label for="vcard_website">Sitio Web (URL):</label>
+                        <input type="url" id="vcard_website" name="vcard_website">
+                        <label for="vcard_birthday">Cumpleaños:</label>
+                        <input type="date" id="vcard_birthday" name="vcard_birthday">
+                        <label for="vcard_note">Nota:</label>
+                        <textarea id="vcard_note" name="vcard_note"></textarea>
+                        <label for="vcard_nickname">Apodo:</label>
+                        <input type="text" id="vcard_nickname" name="vcard_nickname">
+                    </div>
+
+                    <div id="fields_mecard" class="content-fields hidden">
+                        <h4>Información de Contacto (MeCard)</h4>
+                        <label for="mecard_firstname">Nombre:</label>
+                        <input type="text" id="mecard_firstname" name="mecard_firstname">
+                        <label for="mecard_lastname">Apellido:</label>
+                        <input type="text" id="mecard_lastname" name="mecard_lastname">
+                        <small>Al menos Nombre o Apellido es requerido. Formato: Apellido,Nombre.</small>
+
+                        <label for="mecard_reading">Lectura Fonética:</label>
+                        <input type="text" id="mecard_reading" name="mecard_reading">
+                        <label for="mecard_nickname">Apodo:</label>
+                        <input type="text" id="mecard_nickname" name="mecard_nickname">
+                        <label for="mecard_email">Email:</label>
+                        <input type="email" id="mecard_email" name="mecard_email">
+                        <label for="mecard_phone">Teléfono:</label>
+                        <input type="tel" id="mecard_phone" name="mecard_phone">
+                        <label for="mecard_address">Dirección (completa):</label>
+                        <input type="text" id="mecard_address" name="mecard_address">
+                        <label for="mecard_birthday">Cumpleaños:</label>
+                        <input type="date" id="mecard_birthday_input" name="mecard_birthday_input"> <!-- Input separado para el picker -->
+                        <input type="hidden" id="mecard_birthday_formatted" name="mecard_birthday_formatted">
+                        <small>Se formateará a YYYYMMDD.</small>
+                        <label for="mecard_url">Sitio Web (URL):</label>
+                        <input type="url" id="mecard_url" name="mecard_url">
+                        <label for="mecard_memo">Memo:</label>
+                        <textarea id="mecard_memo" name="mecard_memo"></textarea>
+                    </div>
+
+                    <div id="fields_email" class="content-fields hidden">
+                        <h4>Email</h4>
+                        <label for="email_to">Para (Email):<span class="required-mark">*</span></label>
+                        <input type="email" id="email_to" name="email_to" placeholder="destinatario@ejemplo.com" required>
+                        <label for="email_subject">Asunto:</label>
+                        <input type="text" id="email_subject" name="email_subject" placeholder="Asunto del email">
+                        <label for="email_body">Cuerpo del Mensaje:</label>
+                        <textarea id="email_body" name="email_body" placeholder="Escribe tu mensaje aquí"></textarea>
+                    </div>
+
+                    <div id="fields_sms" class="content-fields hidden">
+                        <h4>SMS</h4>
+                        <label for="sms_to">Para (Número de Teléfono):<span class="required-mark">*</span></label>
+                        <input type="tel" id="sms_to" name="sms_to" placeholder="+1234567890" required>
+                        <label for="sms_body">Mensaje:</label>
+                        <textarea id="sms_body" name="sms_body" placeholder="Escribe tu SMS aquí"></textarea>
+                    </div>
+
+                    <div id="fields_tel" class="content-fields hidden">
+                        <h4>Teléfono</h4>
+                        <label for="tel_number">Número de Teléfono:<span class="required-mark">*</span></label>
+                        <input type="tel" id="tel_number" name="tel_number" placeholder="+1234567890" required>
+                    </div>
+
+                    <div id="fields_event" class="content-fields hidden">
+                        <h4>Evento (iCalendar)</h4>
+                        <label for="event_summary">Título del Evento:<span class="required-mark">*</span></label>
+                        <input type="text" id="event_summary" name="event_summary" required>
+                        <label for="event_start_datetime">Inicio:<span class="required-mark">*</span></label>
+                        <input type="datetime-local" id="event_start_datetime" name="event_start_datetime" required>
+                        <label for="event_end_datetime">Fin:<span class="required-mark">*</span></label>
+                        <input type="datetime-local" id="event_end_datetime" name="event_end_datetime" required>
+                        <div id="event_date_error" class="error-message hidden">La fecha de fin debe ser posterior a la de inicio.</div>
+                        <label><input type="checkbox" id="event_allday" name="event_allday"> Todo el día</label>
+                        <label for="event_location">Ubicación:</label>
+                        <input type="text" id="event_location" name="event_location">
+                        <label for="event_description">Descripción:</label>
+                        <textarea id="event_description" name="event_description"></textarea>
+                    </div>
+
+                    <div id="fields_geo" class="content-fields hidden">
+                        <h4>Geolocalización</h4>
+                        <label for="geo_latitude">Latitud:<span class="required-mark">*</span></label>
+                        <input type="number" step="any" id="geo_latitude" name="geo_latitude" placeholder="Ej: 34.0522" required>
+                        <label for="geo_longitude">Longitud:<span class="required-mark">*</span></label>
+                        <input type="number" step="any" id="geo_longitude" name="geo_longitude" placeholder="Ej: -118.2437" required>
+                    </div>
+
+                    <div id="fields_epc" class="content-fields hidden">
+                        <h4>Pago (EPC)</h4>
+                        <label for="epc_name">Nombre del Beneficiario:<span class="required-mark">*</span></label>
+                        <input type="text" id="epc_name" name="epc_name" required>
+                        <label for="epc_iban">IBAN:<span class="required-mark">*</span></label>
+                        <input type="text" id="epc_iban" name="epc_iban" required pattern="[A-Z]{2}[0-9]{2}[A-Z0-9]{4,30}" title="Ej: DE89370400440532013000">
+                        <label for="epc_amount">Importe:<span class="required-mark">*</span></label>
+                        <input type="number" step="0.01" id="epc_amount" name="epc_amount" required min="0.01">
+                        <label for="epc_currency">Moneda (ej. EUR):<span class="required-mark">*</span></label>
+                        <input type="text" id="epc_currency" name="epc_currency" value="EUR" required pattern="[A-Z]{3}">
+                        <label for="epc_bic">BIC (Opcional):</label>
+                        <input type="text" id="epc_bic" name="epc_bic" pattern="[A-Z0-9]{8,11}">
+                        <label for="epc_purpose">Propósito del Pago:</label>
+                        <input type="text" id="epc_purpose" name="epc_purpose">
+                        <label for="epc_reference">Referencia:</label>
+                        <input type="text" id="epc_reference" name="epc_reference">
+                        <label for="epc_remittance">Información de Remesa:</label>
+                        <input type="text" id="epc_remittance" name="epc_remittance">
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>2. Personalización</h3>
+                    <label for="dark_color">Color de los Módulos:</label>
+                    <input type="color" id="dark_color" name="dark_color" value="#000000">
+
+                    <label for="light_color">Color del Fondo:</label>
+                    <input type="color" id="light_color" name="light_color" value="#ffffff">
+                    <label><input type="checkbox" id="transparent_bg" name="transparent_bg"> Fondo Transparente (PNG/SVG)</label>
+
+                    <label for="error_correction">Nivel de Corrección de Errores:<span class="required-mark">*</span></label>
+                    <select id="error_correction" name="error_correction" required>
+                        {% for value, display_text in error_levels.items() %}
+                        <option value="{{ value }}" {% if value == 'M' %}selected{% endif %}>{{ display_text }}</option>
+                        {% endfor %}
+                    </select>
+                    <label for="scale">Escala (Tamaño Módulo en px):<span class="required-mark">*</span></label>
+                    <input type="number" id="scale" name="scale" value="10" min="1" max="100" required>
+                    <label for="border">Borde (módulos):<span class="required-mark">*</span></label>
+                    <input type="number" id="border" name="border" value="4" min="0" max="20" required>
+                </div>
+            </div>
+
+            <div id="right-panel">
+                <div class="form-section">
+                    <h3>3. Previsualización y Descarga</h3>
+                    <div id="qr_code_preview_container">
+                        <p>La previsualización aparecerá aquí.</p>
+                    </div>
+                    <label for="output_format">Formato de Descarga:<span class="required-mark">*</span></label>
+                    <select id="output_format" name="output_format" required>
+                         {% for value, display_text in output_formats.items() %}
+                        <option value="{{ value }}" {% if value == 'png' %}selected{% endif %}>{{ display_text }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="download-button">Generar y Descargar QR</button>
+                    <button type="button" id="preview_button">Actualizar Previsualización</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const contentTypeSelect = document.getElementById('content_type');
+        const allContentFields = document.querySelectorAll('.content-fields');
+        const qrForm = document.getElementById('qrForm');
+        const previewContainer = document.getElementById('qr_code_preview_container');
+        const previewButton = document.getElementById('preview_button');
+        const transparentBgCheckbox = document.getElementById('transparent_bg');
+        const lightColorInput = document.getElementById('light_color');
+        let originalLightColor = lightColorInput.value;
+
+        const fieldRequirements = {
+            'url': ['data_url'],
+            'text': ['data_text'],
+            'wifi': ['wifi_ssid', 'wifi_security'],
+            'vcard': ['vcard_displayname'], // O firstname/lastname, validado en JS
+            'mecard': [], // firstname/lastname validado en JS
+            'email': ['email_to'],
+            'sms': ['sms_to'],
+            'tel': ['tel_number'],
+            'event': ['event_summary', 'event_start_datetime', 'event_end_datetime'],
+            'geo': ['geo_latitude', 'geo_longitude'],
+            'epc': ['epc_name', 'epc_iban', 'epc_amount', 'epc_currency']
+        };
+
+        function updateFieldRequirements() {
+            const selectedType = contentTypeSelect.value;
+            // Quitar 'required' de todos los campos dinámicos primero
+            allContentFields.forEach(fieldset => {
+                fieldset.querySelectorAll('input[data-dynamic-required], textarea[data-dynamic-required], select[data-dynamic-required]').forEach(el => {
+                    el.required = false;
+                    el.removeAttribute('data-dynamic-required');
+                });
+            });
+            // Añadir 'required' a los campos del tipo seleccionado
+            if (fieldRequirements[selectedType]) {
+                fieldRequirements[selectedType].forEach(fieldId => {
+                    const field = document.getElementById(fieldId);
+                    if (field) {
+                        field.required = true;
+                        field.setAttribute('data-dynamic-required', 'true'); // Marcar para limpieza
+                    }
+                });
+            }
+            // Lógica especial para vCard y MeCard nombres
+            if (selectedType === 'vcard') {
+                document.getElementById('vcard_displayname').required = true;
+            } else if (selectedType === 'mecard') {
+                // Se valida en JS que al menos uno de los nombres esté
+            }
+        }
+
+
+        function updateVisibleFields() {
+            const selectedType = contentTypeSelect.value;
+            allContentFields.forEach(fieldSet => {
+                fieldSet.classList.toggle('hidden', fieldSet.id !== `fields_${selectedType}`);
+            });
+            updateFieldRequirements();
+        }
+
+        contentTypeSelect.addEventListener('change', updateVisibleFields);
+
+
+        const mecardBdayInput = document.getElementById('mecard_birthday_input');
+        const mecardBdayFormatted = document.getElementById('mecard_birthday_formatted');
+        if (mecardBdayInput) {
+            mecardBdayInput.addEventListener('change', function() {
+                if (this.value) {
+                    const date = new Date(this.value);
+                    mecardBdayFormatted.value = date.getFullYear() +
+                                              ('0' + (date.getMonth() + 1)).slice(-2) +
+                                              ('0' + date.getDate()).slice(-2);
+                } else {
+                    mecardBdayFormatted.value = '';
+                }
+            });
+        }
+
+        transparentBgCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                originalLightColor = lightColorInput.value;
+                lightColorInput.value = '#ffffff'; // Placeholder, el backend usará 'transparent'
+                lightColorInput.disabled = true;
+            } else {
+                lightColorInput.value = originalLightColor;
+                lightColorInput.disabled = false;
+            }
+        });
+
+        function validateSpecificFields(formData) {
+            let isValid = true;
+            let errorMessages = [];
+
+            const selectedType = formData.get('content_type');
+
+            if (selectedType === 'vcard') {
+                if (!formData.get('vcard_displayname') && !formData.get('vcard_firstname') && !formData.get('vcard_lastname')) {
+                    errorMessages.push("vCard: Se requiere Nombre a Mostrar o Nombre/Apellido.");
+                    isValid = false;
+                }
+            }
+            if (selectedType === 'mecard') {
+                 if (!formData.get('mecard_firstname') && !formData.get('mecard_lastname')) {
+                    errorMessages.push("MeCard: Se requiere Nombre o Apellido.");
+                    isValid = false;
+                }
+            }
+            if (selectedType === 'event') {
+                const start = formData.get('event_start_datetime');
+                const end = formData.get('event_end_datetime');
+                const errorDiv = document.getElementById('event_date_error');
+                if (start && end && new Date(end) <= new Date(start)) {
+                    errorMessages.push("Evento: La fecha de fin debe ser posterior a la de inicio.");
+                    errorDiv.classList.remove('hidden');
+                    isValid = false;
+                } else {
+                     errorDiv.classList.add('hidden');
+                }
+            }
+            if (selectedType === 'wifi'){
+                const security = formData.get('wifi_security');
+                const password = formData.get('wifi_password');
+                if ((security === 'WPA' || security === 'WEP') && !password) {
+                    errorMessages.push("WiFi: Se requiere contraseña para seguridad WPA/WEP.");
+                    isValid = false;
+                }
+            }
+
+
+            if (!isValid) {
+                previewContainer.innerHTML = `<p style="color:red;">Errores de validación:<br>${errorMessages.join('<br>')}</p>`;
+            }
+            return isValid;
+        }
+
+        async function generateQr(isPreview = false) {
+            qrForm.reportValidity(); // Muestra popups de validación del navegador si algo falla
+            if (!qrForm.checkValidity()) {
+                previewContainer.innerHTML = `<p style="color:red;">Por favor, corrija los errores marcados en el formulario.</p>`;
+                return null;
+            }
+
+            const formData = new FormData(qrForm);
+            if (!validateSpecificFields(formData)) { // Validaciones JS adicionales
+                return null;
+            }
+
+            if (transparentBgCheckbox.checked) {
+                formData.set('light_color', 'transparent');
+            }
+
+            let previewFormat = 'png';
+            const selectedOutputFormat = formData.get('output_format');
+            if (selectedOutputFormat === 'txt') previewFormat = 'txt';
+
+            const requestFormData = new FormData(qrForm); // Usar una copia para modificar el formato
+             if (transparentBgCheckbox.checked) { // Asegurar que el valor de transparencia se envíe
+                requestFormData.set('light_color', 'transparent');
+            }
+
+            if (isPreview) {
+                 requestFormData.set('output_format', previewFormat);
+            }
+
+            // Unificar data_url y data_text en 'data' para el backend
+            // Esto ya no es necesario, el backend toma los campos específicos.
+            // Pero la lógica de 'data' en el backend espera un campo 'data' para url y text.
+            // La UI ahora usa data_url y data_text. El backend debe ser adaptado o la UI enviar 'data'.
+            // Por ahora, el backend espera data_url / data_text implícitamente.
+            // La validación de arriba asegura que los campos correctos están 'required'.
+
+            previewContainer.innerHTML = '<p>Generando...</p>';
+
+            try {
+                const response = await fetch('/generate', { method: 'POST', body: requestFormData });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: "Error de servidor." , field_errors: {}}));
+                    let errorHtml = `<p style="color:red;">Error: ${response.status} - ${errorData.error || 'No se pudo generar.'}</p>`;
+                    if(errorData.field_errors){
+                        errorHtml += '<ul>';
+                        for(const field in errorData.field_errors){
+                            errorHtml += `<li>${field}: ${errorData.field_errors[field]}</li>`;
+                        }
+                        errorHtml += '</ul>';
+                    }
+                    previewContainer.innerHTML = errorHtml;
+                    if (!isPreview) alert(`Error: ${response.status} - ${errorData.error || 'No se pudo generar.'}`);
+                    return null;
+                }
+
+                if (isPreview) {
+                    if (previewFormat === 'png') {
+                        const blob = await response.blob();
+                        const objectURL = URL.createObjectURL(blob);
+                        previewContainer.innerHTML = `<img src="${objectURL}" alt="QR Code Preview">`;
+                    } else if (previewFormat === 'svg') {
+                        const svgText = await response.text();
+                        previewContainer.innerHTML = svgText;
+                    } else if (previewFormat === 'txt') {
+                        const textData = await response.text();
+                        previewContainer.innerHTML = `<pre>${textData.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
+                    }
+                } else {
+                    const blob = await response.blob();
+                    const downloadUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = `qrcode.${requestFormData.get('output_format')}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(downloadUrl);
+                    previewContainer.innerHTML = '<p style="color:green;">¡QR Descargado! Puede generar otro.</p>';
+                }
+                return response;
+
+            } catch (error) {
+                console.error('Error en la petición:', error);
+                previewContainer.innerHTML = `<p style="color:red;">Error de red o conexión.</p>`;
+                if (!isPreview) alert('Error de red o conexión.');
+                return null;
+            }
+        }
+
+        qrForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            generateQr(false);
+        });
+        previewButton.addEventListener('click', function() {
+            generateQr(true);
+        });
+
+        // Inicializar campos visibles y requeridos
+        updateVisibleFields();
+    </script>
+</body>
+</html>
