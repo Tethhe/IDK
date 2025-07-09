@@ -49,6 +49,9 @@
     <div class="container">
         <h1>Generador de Códigos QR Avanzado</h1>
         <form id="qrForm" class="form-grid" novalidate> <!-- novalidate para manejar validación con JS -->
+            <div style="grid-column: 1 / -1; text-align: right; margin-bottom:10px;">
+                <a href="{{ url_for('show_stats') }}" class="stats-link" style="padding: 8px 12px; background-color: #17a2b8; color: white; text-decoration: none; border-radius: 4px;">Ver Estadísticas de QR</a>
+            </div>
             <div id="left-panel">
                 <div class="form-section">
                     <h3>1. Tipo de Contenido</h3>
@@ -62,6 +65,10 @@
                     <div id="fields_url" class="content-fields">
                         <label for="data_url">URL:<span class="required-mark">*</span></label>
                         <input type="url" id="data_url" name="data_url" placeholder="https://ejemplo.com" required>
+                        <label for="enable_tracking" style="display: inline-flex; align-items: center; margin-top: 10px;">
+                            <input type="checkbox" id="enable_tracking" name="enable_tracking" style="margin-right: 5px;">
+                            Habilitar seguimiento de clics
+                        </label>
                     </div>
                     <div id="fields_text" class="content-fields hidden">
                         <label for="data_text">Texto:<span class="required-mark">*</span></label>
@@ -278,6 +285,9 @@
         const previewButton = document.getElementById('preview_button');
         const transparentBgCheckbox = document.getElementById('transparent_bg');
         const lightColorInput = document.getElementById('light_color');
+        const enableTrackingCheckbox = document.getElementById('enable_tracking');
+        const enableTrackingLabel = document.querySelector('label[for="enable_tracking"]');
+
         let originalLightColor = lightColorInput.value;
 
         const fieldRequirements = {
@@ -328,6 +338,14 @@
                 fieldSet.classList.toggle('hidden', fieldSet.id !== `fields_${selectedType}`);
             });
             updateFieldRequirements();
+
+            // Mostrar u ocultar la opción de seguimiento de clics
+            if (selectedType === 'url') {
+                if (enableTrackingLabel) enableTrackingLabel.style.display = 'inline-flex';
+            } else {
+                if (enableTrackingLabel) enableTrackingLabel.style.display = 'none';
+                if (enableTrackingCheckbox) enableTrackingCheckbox.checked = false; // Desmarcar si se cambia de tipo
+            }
         }
 
         contentTypeSelect.addEventListener('change', updateVisibleFields);
