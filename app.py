@@ -1,10 +1,33 @@
-from flask import Flask, render_template, request, send_file, jsonify
-from qr_generator_logic import generate_qr_code # Ya no necesitamos los constructores aquí directamente
+from flask import Flask, render_template, request, send_file, jsonify, redirect, url_for
+from qr_generator_logic import generate_qr_code
 from io import BytesIO
 import datetime
-import re # Para validaciones más complejas
+import re
+import uuid
+from flask_sqlalchemy import SQLAlchemy
+import os
 
 app = Flask(__name__)
+
+# Configuración de la base de datos SQLite
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'qr_codes.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+# Modelo de la base de datos para los QRs rastreables
+class TrackableQR(db.Model):
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    original_url = db.Column(db.String(2048), nullable=False)
+    visit_count = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    short_code = db.Column(db.String(10), unique=True, nullable=False)
+
+    def __repr__(self):
+        return f'<TrackableQR {self.short_code} -> {self.original_url} (Visits: {self.visit_count})>'
+
+with app.app_context():
+    db.create_all() # Crea las tablas si no existen
 
 ERROR_LEVELS = {'L': 'L (Low ~7%)', 'M': 'M (Medium ~15%)', 'Q': 'Q (Quartile ~25%)', 'H': 'H (High ~30%)'}
 OUTPUT_FORMATS = {'png': 'PNG', 'svg': 'SVG', 'txt': 'TXT (Text Art)'} # HTML no soportado por ahora
@@ -66,7 +89,7 @@ def generate():
             errors['data_url'] = "Se requiere una URL válida (http:// o https://)."
     elif content_type == 'text':
         if not data_from_form.strip(): errors['data_text'] = "El texto no puede estar vacío."
-
+    # No se necesita validación extra para 'enable_tracking' aquí, se maneja en la lógica de generación.
     elif content_type == 'wifi':
         kwargs_for_generator['wifi_ssid'] = form_data.get('wifi_ssid')
         if not kwargs_for_generator['wifi_ssid']: errors['wifi_ssid'] = "SSID es obligatorio."
@@ -175,15 +198,39 @@ def generate():
         return jsonify({"success": False, "error": "Datos inválidos.", "field_errors": errors}), 400
 
     # --- Llamada a la Lógica de Generación ---
+    data_for_qr = data_from_form
+    enable_tracking = form_data.get('enable_tracking') == 'on'
+
+    if content_type == 'url' and enable_tracking:
+        if not data_from_form or not (data_from_form.startswith('http://') or data_from_form.startswith('https://')):
+            # Este error ya debería haber sido capturado antes, pero por si acaso.
+            return jsonify({"success": False, "error": "Se requiere una URL válida para el seguimiento.", "field_errors": {'data_url': 'URL inválida.'}}), 400
+
+        # Generar un short_code único
+        short_code = uuid.uuid4().hex[:6] # Un código corto, podría necesitar lógica para asegurar unicidad si hay colisiones
+        while TrackableQR.query.filter_by(short_code=short_code).first() is not None:
+            short_code = uuid.uuid4().hex[:6]
+
+        new_qr_record = TrackableQR(original_url=data_from_form, short_code=short_code)
+        db.session.add(new_qr_record)
+        try:
+            db.session.commit()
+            # La URL que se codificará en el QR será la URL de seguimiento
+            data_for_qr = url_for('track_qr_visit', short_code=short_code, _external=True)
+        except Exception as e: # Podría ser por colisión de short_code si no se maneja bien o error de BD
+            db.session.rollback()
+            app.logger.error(f"Error al guardar QR rastreable: {e}")
+            return jsonify({"success": False, "error": "No se pudo crear el QR rastreable en la base de datos."}), 500
+
     try:
         qr_result = generate_qr_code(
-            data=data_from_form, # Solo para URL y Texto, otros lo ignoran
+            data=data_for_qr, # Usar data_for_qr que puede ser la URL de seguimiento
             error=error_correction, scale=scale, border=border,
             dark_color=dark_color, light_color=light_color,
-            output_format=output_format, content_type=content_type,
-            **kwargs_for_generator # Pasa todos los params específicos del tipo de contenido
+            output_format=output_format, content_type=content_type, # content_type sigue siendo 'url' para la lógica de formato
+            **kwargs_for_generator
         )
-    except ValueError as ve: # Capturar ValueErrors de la lógica de generación (ej. datos insuficientes)
+    except ValueError as ve:
          return jsonify({"success": False, "error": str(ve)}), 400
     except NotImplementedError as nie:
          return jsonify({"success": False, "error": str(nie)}), 501 # Not Implemented
@@ -199,6 +246,27 @@ def generate():
     mimetype = mimetype_map.get(output_format, 'application/octet-stream')
 
     return send_file(qr_result, mimetype=mimetype, as_attachment=True, download_name=filename)
+
+@app.route('/track/<short_code>')
+def track_qr_visit(short_code):
+    qr_record = TrackableQR.query.filter_by(short_code=short_code).first_or_404()
+
+    # Incrementar el contador de visitas
+    qr_record.visit_count += 1
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error al actualizar el contador de visitas para {short_code}: {e}")
+        # Opcionalmente, redirigir igualmente o mostrar un error diferente
+        # Por ahora, redirigimos para no interrumpir al usuario
+
+    return redirect(qr_record.original_url)
+
+@app.route('/stats')
+def show_stats():
+    tracked_qrs = TrackableQR.query.order_by(TrackableQR.created_at.desc()).all()
+    return render_template('stats.html', qrs=tracked_qrs)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
