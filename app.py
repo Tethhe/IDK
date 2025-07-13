@@ -61,9 +61,9 @@ def generate():
     error_correction = form_data.get('error_correction', 'M')
     if error_correction not in ERROR_LEVELS: errors['error_correction'] = "Nivel de error inválido."
 
-    try: scale = int(form_data.get('scale', '10'))
-    except ValueError: errors['scale'] = "La escala debe ser un número."; scale = 10
-    if not 1 <= scale <= 100: errors['scale'] = "La escala debe estar entre 1 y 100."
+    try: scale = int(form_data.get('scale', '20'))
+    except ValueError: errors['scale'] = "La escala debe ser un número."; scale = 20
+    if not 1 <= scale <= 200: errors['scale'] = "La escala debe estar entre 1 y 200."
 
     try: border = int(form_data.get('border', '4'))
     except ValueError: errors['border'] = "El borde debe ser un número."; border = 4

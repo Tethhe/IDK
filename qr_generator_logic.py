@@ -225,15 +225,17 @@ def generate_qr_code(data, error='q', scale=10, border=4,
         if light_color and light_color.lower() == 'transparent' and output_format in ['png', 'svg']:
             effective_light_color = "transparent" # PilImage y SvgImage manejan "transparent"
 
-        pil_kwargs = {'fill_color': dark_color, 'back_color': effective_light_color}
-        svg_kwargs = {'module_color': dark_color} # SvgImage usa module_color
-        if effective_light_color != "transparent":
-            svg_kwargs['background_color'] = effective_light_color # y background_color
-        # Si es transparent, SvgImage omite el fondo por defecto.
+        # Determinar el image_factory y los kwargs correspondientes
+        image_factory = None
+        factory_kwargs = {}
+
+        # Determinar el image_factory y los kwargs correspondientes
+        image_factory = None
+        factory_kwargs = {}
 
         out = BytesIO()
         if output_format == 'svg':
-            img = qr_obj.make_image(image_factory=SvgPathImage, **svg_kwargs)
+            img = qr_obj.make_image(image_factory=SvgPathImage, module_color=dark_color, background=light_color)
             img.save(out)
         elif output_format == 'txt':
             import io
@@ -242,7 +244,7 @@ def generate_qr_code(data, error='q', scale=10, border=4,
             temp_out.seek(0)
             out.write(temp_out.read().encode('utf-8'))
         else: # PNG y otros formatos que PilImage pueda manejar
-            img = qr_obj.make_image(image_factory=StyledPilImage, **pil_kwargs)
+            img = qr_obj.make_image(image_factory=StyledPilImage, fill_color=dark_color, back_color=light_color)
             pil_format = 'PNG' # Default
             if output_format.upper() in ["JPEG", "JPG"]: pil_format = "JPEG"
             elif output_format.upper() == "BMP": pil_format = "BMP"
