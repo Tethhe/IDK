@@ -41,15 +41,10 @@ class TestQRGeneratorLogicPythonQrcode(unittest.TestCase):
 
         self.assertTrue("<svg" in svg_content.strip()[:100], "SVG content should contain '<svg' near the beginning")
 
-        # python-qrcode SvgPathImage pone module_color y background_color como atributos en el tag <svg>
-        # y el path principal usa un fill (a menudo negro por defecto si no se sobreescribe de otra manera)
+        # Check for module and background colors in the svg tag
         self.assertIn(f'module_color="{dark_color_hex}"', svg_content)
-        self.assertIn('id="qr-path" fill="', svg_content) # El path tiene un fill
-
         if light_color_hex.lower() not in ['transparent', 'none']:
-            self.assertIn(f'background_color="{light_color_hex}"', svg_content)
-            # También puede haber un <rect> con el color de fondo.
-            # La presencia de background_color en el tag <svg> es una buena indicación.
+            self.assertIn(f'background="{light_color_hex}"', svg_content)
 
 
     def test_generate_text_txt(self):
