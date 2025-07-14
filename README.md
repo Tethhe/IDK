@@ -114,4 +114,37 @@ python -m unittest test_qr_generator_logic.py
 *   Guardar configuraciones de QR personalizadas por el usuario (requeriría base de datos o almacenamiento local).
 *   API para generación de QR.
 *   Despliegue en una plataforma (ej. Docker, Heroku, etc.).
+
+## Running with Docker
+
+To run this application with Docker, you can use the provided `Dockerfile` and `docker-compose.yml` files.
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/) (v2)
+
+### Instructions
+
+1.  **Build and run the container:**
+
+    ```bash
+    docker compose up --build -d
+    ```
+
+    *Note: Depending on your Docker installation, you may need to run this command with `sudo`.*
+
+2.  **Access the application:**
+
+    Once the container is running, you can access the application in your web browser at:
+
+    [http://localhost:8080](http://localhost:8080)
+
+3.  **Stopping the application:**
+
+    To stop the application, run:
+
+    ```bash
+    docker compose down
+    ```
 ```
