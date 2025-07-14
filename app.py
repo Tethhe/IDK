@@ -269,4 +269,4 @@ def show_stats():
     return render_template('stats.html', qrs=tracked_qrs)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0', port=8080)
