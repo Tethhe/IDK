@@ -1,0 +1,3 @@
+
+> latex-editor@0.1.0 dev
+> concurrently "npm start" "npm run electron"
