@@ -113,10 +113,10 @@ class TestQRGeneratorLogicPythonQrcode(unittest.TestCase):
         result = generate_qr_code("transparent BG SVG", content_type='text', light_color='transparent', output_format='svg')
         svg_content = self._assert_is_valid_bytesio_output(result, decode_as_text=True, content_type_for_debug="transparent_svg")
         self.assertTrue("<svg" in svg_content.strip()[:100], "SVG content should contain '<svg' near the beginning")
-        # Con back_color="transparent", SvgPathImage no debería definir un background_color sólido en el tag <svg>
-        # o un <rect> de fondo con fill sólido.
-        self.assertNotIn('background_color="#ffffff"', svg_content.lower())
-        self.assertNotIn('fill="white"', svg_content.lower()) # Asegurar que no haya un rect blanco de fondo
+        # SvgPathImage añade un atributo 'background' al tag <svg>.
+        self.assertIn('background="transparent"', svg_content, "El SVG debe tener un atributo de fondo transparente.")
+        # Nos aseguramos de que no sea el blanco por defecto.
+        self.assertNotIn('background="#ffffff"', svg_content, "El fondo blanco no debería estar presente en SVG transparente")
 
 
     def test_empty_data_string_for_url_or_text(self):
