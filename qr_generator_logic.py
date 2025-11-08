@@ -220,22 +220,15 @@ def generate_qr_code(data, error='q', scale=10, border=4,
         qr_obj.add_data(actual_data)
         qr_obj.make(fit=True)
 
-        # Determinar kwargs para make_image basado en transparencia
-        effective_light_color = light_color
-        if light_color and light_color.lower() == 'transparent' and output_format in ['png', 'svg']:
-            effective_light_color = "transparent" # PilImage y SvgImage manejan "transparent"
-
-        # Determinar el image_factory y los kwargs correspondientes
-        image_factory = None
-        factory_kwargs = {}
-
-        # Determinar el image_factory y los kwargs correspondientes
-        image_factory = None
-        factory_kwargs = {}
+        is_transparent = light_color and light_color.lower() == 'transparent'
 
         out = BytesIO()
         if output_format == 'svg':
-            img = qr_obj.make_image(image_factory=SvgPathImage, module_color=dark_color, background=light_color)
+            img = qr_obj.make_image(
+                image_factory=SvgPathImage,
+                module_color=dark_color,
+                background='transparent' if is_transparent else light_color
+            )
             img.save(out)
         elif output_format == 'txt':
             import io
@@ -243,15 +236,32 @@ def generate_qr_code(data, error='q', scale=10, border=4,
             qr_obj.print_ascii(out=temp_out, tty=False)
             temp_out.seek(0)
             out.write(temp_out.read().encode('utf-8'))
-        else: # PNG y otros formatos que PilImage pueda manejar
-            img = qr_obj.make_image(image_factory=StyledPilImage, fill_color=dark_color, back_color=light_color)
-            pil_format = 'PNG' # Default
-            if output_format.upper() in ["JPEG", "JPG"]: pil_format = "JPEG"
-            elif output_format.upper() == "BMP": pil_format = "BMP"
-            elif output_format.upper() == "GIF": pil_format = "GIF"
-            # EPS/PDF no son directos, se quedarán como PNG por ahora si se piden.
-            if output_format not in ['png', 'svg', 'txt', 'jpeg', 'jpg', 'bmp', 'gif']:
+        else:  # PNG y otros formatos de Pillow
+            pil_format = output_format.upper()
+            if pil_format not in ['PNG', 'JPEG', 'JPG', 'BMP', 'GIF']:
                 pil_format = 'PNG'
+
+            # StyledPilImage no maneja bien la transparencia, así que la manejamos manualmente.
+            # Generamos con fondo blanco y luego lo hacemos transparente si es necesario.
+            final_light_color = '#FFFFFF' if is_transparent else light_color
+            img = qr_obj.make_image(
+                image_factory=StyledPilImage,
+                fill_color=dark_color,
+                back_color=final_light_color
+            )
+
+            if is_transparent and pil_format == 'PNG':
+                img = img.convert("RGBA")
+                datas = img.getdata()
+                newData = []
+                for item in datas:
+                    # Hacemos transparente el blanco (o casi blanco)
+                    if item[0] >= 250 and item[1] >= 250 and item[2] >= 250:
+                        newData.append((255, 255, 255, 0))
+                    else:
+                        newData.append(item)
+                img.putdata(newData)
+
             img.save(out, format=pil_format)
 
         out.seek(0)
