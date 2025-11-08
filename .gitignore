@@ -1,7 +1,7 @@
 venv/
 __pycache__/
 *.pyc
-qr_codes.db
+*.db
 
 # Docker
 .dockerignore
